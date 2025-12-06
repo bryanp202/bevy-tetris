@@ -324,16 +324,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy-test"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bitflags 2.10.0",
- "rand",
- "rand_chacha",
-]
-
-[[package]]
 name = "bevy_a11y"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1332,6 +1322,16 @@ dependencies = [
  "futures-lite",
  "heapless",
  "pin-project",
+]
+
+[[package]]
+name = "bevy_tetris"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bitflags 2.10.0",
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]
