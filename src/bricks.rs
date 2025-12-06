@@ -10,7 +10,7 @@ use crate::{Brick, RngRes};
 
 use rand::Rng;
 
-pub const BRICK_SIZE: f32 = 40.0;
+pub const BRICK_SIZE: f32 = 32.0;
 const GRID_WIDTH: usize = 10;
 const GRID_HEIGHT: usize = 20;
 const GRID_LINE_THICKNESS: f32 = 4.0;
@@ -161,7 +161,7 @@ impl BrickGrid {
             self.data[target] = self.data[y];
             target += 1;
         }
-        for y in GRID_HEIGHT - rows..GRID_HEIGHT {
+        for y in target..GRID_HEIGHT {
             self.data[y].fill(None);
         }
 
