@@ -6,7 +6,7 @@ mod input;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use rand::SeedableRng;
+use rand::{RngCore, SeedableRng, rng};
 use rand_chacha::ChaCha8Rng;
 
 use crate::{
@@ -440,10 +440,8 @@ impl Default for RngRes {
     fn default() -> Self {
         Self {
             gener: ChaCha8Rng::seed_from_u64(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|dur| dur.as_secs())
-                    .unwrap_or(1126541),
+                rng().next_u64()
+                    //.unwrap_or(1126541),
             ),
         }
     }
