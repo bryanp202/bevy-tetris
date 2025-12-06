@@ -12,7 +12,7 @@ use rand_chacha::ChaCha8Rng;
 use crate::{
     bricks::{
         BRICK_SIZE, BrickGrid, TetrominoData, TetrominoOrientation, TetrominoType,
-        grid_to_transform,
+        grid_to_transform, init_grid,
     },
     input::{InputFlags, LogicalInputs, Rotation, Shift, TetrisCloneInputPlugin},
 };
@@ -50,7 +50,7 @@ impl Plugin for TetrisClonePlugin {
 fn setup(mut rng: ResMut<RngRes>, mut commands: Commands) {
     commands.spawn((MainCamera, Camera2d));
     spawn_tetromino(&mut rng, &mut commands);
-    make_grid(&mut commands);
+    init_grid(&mut commands);
 
     commands.spawn((
         Text::new("Score: "),
@@ -148,33 +148,6 @@ fn setup(mut rng: ResMut<RngRes>, mut commands: Commands) {
         )],
     ));
 }
-
-fn make_grid(commands: &mut Commands) {
-    for row in 0..21 {
-        let mut transform = grid_to_transform(IVec2::new(5, row), IVec2::default()).with_z(1.0);
-        transform.x -= BRICK_SIZE * 0.5;
-        transform.y -= BRICK_SIZE * 0.5;
-        commands.spawn((
-            GridLine,
-            Sprite::from_color(Color::BLACK, Vec2::new(BRICK_SIZE * 10.0, 1.0)),
-            Transform::from_translation(transform),
-        ));
-    }
-
-    for column in 0..11 {
-        let mut transform = grid_to_transform(IVec2::new(column, 10), IVec2::default()).with_z(1.0);
-        transform.x -= BRICK_SIZE * 0.5;
-        transform.y -= BRICK_SIZE * 0.5;
-        commands.spawn((
-            GridLine,
-            Sprite::from_color(Color::BLACK, Vec2::new(1.0, BRICK_SIZE * 20.0)),
-            Transform::from_translation(transform),
-        ));
-    }
-}
-
-#[derive(Component)]
-struct GridLine;
 
 fn tetromino_move_observer(
     moved: On<TetrominoMoveEvent>,

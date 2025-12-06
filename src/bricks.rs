@@ -1,6 +1,6 @@
 use bevy::{
     color::{Color, Hsla},
-    ecs::{resource::Resource, system::Commands},
+    ecs::{component::Component, resource::Resource, system::Commands},
     math::{IVec2, Vec2, Vec3},
     sprite::Sprite,
     transform::components::Transform,
@@ -13,7 +13,51 @@ use rand::Rng;
 pub const BRICK_SIZE: f32 = 40.0;
 const GRID_WIDTH: usize = 10;
 const GRID_HEIGHT: usize = 20;
+const GRID_LINE_THICKNESS: f32 = 4.0;
+const GRID_LINE_COLOR: Color = Color::hsl(0.0, 0.0, 0.03);
 const GAME_OVER_CUTOFF: isize = 0;
+
+pub fn init_grid(commands: &mut Commands) {
+    for row in 0..21 {
+        let mut transform = grid_to_transform(
+            IVec2::new(GRID_WIDTH.div_ceil(2) as i32, row),
+            IVec2::default(),
+        )
+        .with_z(1.0);
+        transform.x -= BRICK_SIZE * 0.5;
+        transform.y -= BRICK_SIZE * 0.5;
+        commands.spawn((
+            GridLine,
+            Sprite::from_color(
+                GRID_LINE_COLOR,
+                Vec2::new(BRICK_SIZE * GRID_WIDTH as f32, GRID_LINE_THICKNESS),
+            ),
+            Transform::from_translation(transform),
+        ));
+    }
+
+    for column in 0..11 {
+        let mut transform = grid_to_transform(
+            IVec2::new(column, GRID_HEIGHT.div_ceil(2) as i32),
+            IVec2::default(),
+        )
+        .with_z(1.0);
+        transform.x -= BRICK_SIZE * 0.5;
+        transform.y -= BRICK_SIZE * 0.5;
+        commands.spawn((
+            GridLine,
+            Sprite::from_color(
+                GRID_LINE_COLOR,
+                Vec2::new(GRID_LINE_THICKNESS, BRICK_SIZE * GRID_HEIGHT as f32),
+            ),
+            Transform::from_translation(transform),
+        ));
+    }
+}
+
+#[derive(Component)]
+struct GridLine;
+
 #[derive(Resource)]
 /// Collision and color data of the tetris bricks
 ///
