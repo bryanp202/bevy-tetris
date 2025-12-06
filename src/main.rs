@@ -21,6 +21,8 @@ const SCORE_COLOR: Color = Color::WHITE;
 const SCOREBOARD_FONT_SIZE: f32 = 32.0;
 const SCOREBOARD_TEXT_PADDING: Val = Val::Px(5.0);
 
+const GRAVITY_TIMER_INIT: f32 = 0.5;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
@@ -97,6 +99,54 @@ fn setup(mut rng: ResMut<RngRes>, mut commands: Commands) {
             TextColor(SCORE_COLOR),
         )],
     ));
+
+    commands.spawn((
+        Text::new("Level: "),
+        TextFont {
+            font_size: SCOREBOARD_FONT_SIZE,
+            ..default()
+        },
+        LevelUi,
+        TextColor(SCORE_COLOR),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(SCOREBOARD_FONT_SIZE * 5.0),
+            left: SCOREBOARD_TEXT_PADDING,
+            ..default()
+        },
+        children![(
+            TextSpan::new("1"),
+            TextFont {
+                font_size: SCOREBOARD_FONT_SIZE,
+                ..default()
+            },
+            TextColor(SCORE_COLOR),
+        )],
+    ));
+
+    commands.spawn((
+        Text::new("Combo: "),
+        TextFont {
+            font_size: SCOREBOARD_FONT_SIZE,
+            ..default()
+        },
+        ComboUi,
+        TextColor(SCORE_COLOR),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(SCOREBOARD_FONT_SIZE * 7.0),
+            left: SCOREBOARD_TEXT_PADDING,
+            ..default()
+        },
+        children![(
+            TextSpan::new("1"),
+            TextFont {
+                font_size: SCOREBOARD_FONT_SIZE,
+                ..default()
+            },
+            TextColor(SCORE_COLOR),
+        )],
+    ));
 }
 
 fn make_grid(commands: &mut Commands) {
@@ -148,8 +198,11 @@ fn tetromino_place_observer(
     placed: On<TetrominoPlaceEvent>,
     tetrominos: Query<(Entity, &Tetromino)>,
     inactive_bricks: Query<Entity, (With<Brick>, Without<Active>)>,
+    combo_root: Single<Entity, (With<ComboUi>, With<Text>)>,
     mut brick_grid: ResMut<BrickGrid>,
     mut rng: ResMut<RngRes>,
+    mut score: ResMut<Scoreboard>,
+    mut writer: TextUiWriter,
     mut commands: Commands,
 ) {
     let Ok((tetromino_entity, tetromino)) = tetrominos.get(placed.0) else {
@@ -160,6 +213,9 @@ fn tetromino_place_observer(
 
     if cleared_rows > 0 {
         commands.trigger(RowClearEvent(cleared_rows));
+    } else {
+        score.combo = 1;
+        *writer.text(*combo_root, 1) = score.combo.to_string();
     }
 
     commands.entity(tetromino_entity).despawn();
@@ -174,22 +230,29 @@ fn tetromino_place_observer(
 
 fn score_observer(
     cleared_rows: On<RowClearEvent>,
-    mut score: ResMut<Scoreboard>,
     score_root: Single<Entity, (With<ScoreUi>, With<Text>)>,
     rows_root: Single<Entity, (With<ClearedRowsUi>, With<Text>)>,
+    level_root: Single<Entity, (With<LevelUi>, With<Text>)>,
+    combo_root: Single<Entity, (With<ComboUi>, With<Text>)>,
     mut writer: TextUiWriter,
+    mut score: ResMut<Scoreboard>,
 ) {
     score.cleared_rows += cleared_rows.0;
-    score.score += match cleared_rows.0 {
-        1 => 100,
-        2 => 300,
-        3 => 500,
-        4 => 800,
-        _ => 0,
-    };
+    score.score += score.combo
+        * match cleared_rows.0 {
+            1 => 100,
+            2 => 300,
+            3 => 500,
+            4 => 800,
+            _ => 0,
+        };
+    score.level = score.score / 1_000 + 1;
+    score.combo += 1;
 
     *writer.text(*score_root, 1) = score.score.to_string();
     *writer.text(*rows_root, 1) = score.cleared_rows.to_string();
+    *writer.text(*level_root, 1) = score.level.to_string();
+    *writer.text(*combo_root, 1) = score.combo.to_string();
 }
 
 fn zoom_ctrl(
@@ -219,7 +282,10 @@ fn spawn_tetromino(rng: &mut RngRes, commands: &mut Commands) {
                 kind: tetromino.kind,
                 orient: tetromino.orient,
             },
-            GravityTimer(Timer::from_seconds(0.5, TimerMode::Repeating)),
+            GravityTimer(Timer::from_seconds(
+                GRAVITY_TIMER_INIT,
+                TimerMode::Repeating,
+            )),
             Visibility::Visible,
             Transform::from_xyz(0.0, 0.0, 0.0),
         ))
@@ -238,6 +304,7 @@ fn spawn_tetromino(rng: &mut RngRes, commands: &mut Commands) {
 
 fn handle_input(
     inputs: Res<LogicalInputs>,
+    score: Res<Scoreboard>,
     brick_grid: Res<BrickGrid>,
     tetrominos: Query<(Entity, &mut Tetromino, &mut GravityTimer)>,
     mut commands: Commands,
@@ -255,13 +322,14 @@ fn handle_input(
             Rotation::CCW => Some(tetromino.rot_ccw()),
         };
 
-        if inputs.flags().contains(InputFlags::FastFall) {
-            gravity_timer
-                .0
-                .set_duration(Duration::from_secs_f32(0.0625));
+        let level_gravity_dur =
+            Duration::from_secs_f32(GRAVITY_TIMER_INIT / 2.0f32.powi(score.level as i32 / 4));
+        let gravity_dur = if inputs.flags().contains(InputFlags::FastFall) {
+            Duration::from_secs_f32(0.0625).min(level_gravity_dur)
         } else {
-            gravity_timer.0.set_duration(Duration::from_secs_f32(0.5));
-        }
+            level_gravity_dur
+        };
+        gravity_timer.0.set_duration(gravity_dur);
 
         let moved = tetromino.check_move(&brick_grid, new_offset, new_orient);
 
@@ -371,11 +439,23 @@ struct Brick;
 #[derive(Component)]
 struct Active;
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct Scoreboard {
-    time: usize,
     cleared_rows: usize,
     score: usize,
+    level: usize,
+    combo: usize,
+}
+
+impl Default for Scoreboard {
+    fn default() -> Self {
+        Self {
+            cleared_rows: 0,
+            score: 0,
+            level: 1,
+            combo: 1,
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -404,3 +484,9 @@ pub struct ClearedRowsUi;
 
 #[derive(Component)]
 pub struct ScoreUi;
+
+#[derive(Component)]
+pub struct LevelUi;
+
+#[derive(Component)]
+pub struct ComboUi;
